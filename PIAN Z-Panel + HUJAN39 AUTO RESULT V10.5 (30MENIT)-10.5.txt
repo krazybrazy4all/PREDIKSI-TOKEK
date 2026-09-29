@@ -1,0 +1,4988 @@
+// ==UserScript==
+// @name         PIAN Z-Panel + HUJAN39 AUTO RESULT V10.5 (30MENIT)
+// @namespace    Tampermonkey
+// @version      10.5
+// @description  Sinkron ZPanel PIAN + HUJAN39 dengan dynamic pool mapping, date/time safety dan auto check 1 jam.
+// @match        https://pian.prediksi-tokek.com/*
+// @match        https://hujan39.store/*
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_addValueChangeListener
+// @grant        GM_openInTab
+// @run-at       document-idle
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    const VERSION = '10.5';
+
+    const HISTORY_URL =
+        'https://hujan39.store/history/number';
+
+    const ADD_DELAY = 850;
+    const UPDATE_DELAY = 650;
+
+    const AUTO_INTERVAL =
+        30 * 60 * 1000;
+
+    const WATCH_INTERVAL =
+        60 * 1000;
+
+
+    // =========================================================
+    // CHANNEL KHUSUS PIAN
+    // supaya tidak bentrok dengan ZPanel lain
+    // =========================================================
+
+    const K = {
+
+        cmd:
+            'PIAN105_COMMAND',
+
+        status:
+            'PIAN105_STATUS',
+
+        data:
+            'PIAN105_DATA',
+
+        beat:
+            'PIAN105_HEARTBEAT',
+
+        stop:
+            'PIAN105_STOP',
+
+        auto:
+            'PIAN105_AUTO_ENABLED',
+
+        last:
+            'PIAN105_LAST_AUTO_CHECK'
+    };
+
+
+    // =========================================================
+    // URUTAN PASARAN ZPANEL
+    // =========================================================
+
+    const PASARAN = [
+
+        'los-angeles-mid',
+        'greece',
+        'manila',
+        'manhattan',
+        'carolina-day',
+        'toronto-eve',
+        'oregon3',
+        'orlando',
+        'colorado',
+        'dallas',
+        'washington-mid',
+        'miami-mid',
+        'oregon6',
+        'montana',
+        'selangor',
+        'michigan',
+        'makati-mor',
+        'oregon9',
+        'beijing',
+        'kentucky-eve',
+        'shanghai-mor',
+        'siem-reap',
+        'guangzhou',
+        'cambodia',
+        'oregon12',
+        'bullseye',
+        'johor',
+        'washington-eve',
+
+        'totomacau-13',
+        'sydney',
+        'california-mor',
+        'busan',
+        'wuhan',
+        'totomacau-15-5d',
+        'jeju',
+        'seoul',
+
+        'totomacau-16',
+        'toronto-mid',
+        'sapporo',
+        'kingkong-17',
+        'osaka',
+        'singapore',
+        'phuket',
+        'shanghai-night',
+        'los-angeles-eve',
+
+        'totomacau-19',
+        'ulanbator',
+        'cuba',
+        'danang',
+        'taipei',
+        'penang',
+        'totomacau-21-5d',
+        'myanmar',
+        'batam',
+        'miami-eve',
+
+        'totomacau-22',
+        'chicago',
+        'hongkong',
+        'totomacau-23',
+
+        'makati-night',
+        'kingkong-23',
+        'california-day',
+        'totomacau-00'
+    ];
+
+
+    // =========================================================
+    // NAMA POOL HUJAN39
+    //
+    // code di bawah hanya FALLBACK.
+    // Saat History terbuka, script membaca data-code langsung
+    // dari <option data-name="" data-code="">.
+    // =========================================================
+
+    const HISTORY_POOL = {
+
+        'bullseye': {
+            name: 'BULLSEYE POOL',
+            code: 'p9487',
+            digits: 4
+        },
+
+        'california-mor': {
+            name: 'CALIFORNIA POOL',
+            code: 'p9488',
+            digits: 4
+        },
+
+        'california-day': {
+            name: 'CALIFORNIAD POOL',
+            code: 'p9489',
+            digits: 4
+        },
+
+        'cambodia': {
+            name: 'CAMBODIA POOL',
+            code: 'p9490',
+            digits: 4
+        },
+
+        'carolina-day': {
+            name: 'CAROLINADAY POOL',
+            code: 'p9491',
+            digits: 4
+        },
+
+        'cuba': {
+            name: 'CUBA POOL',
+            code: 'p9492',
+            digits: 4
+        },
+
+        'greece': {
+            name: 'GREECE POOL',
+            code: 'p9493',
+            digits: 4
+        },
+
+        'hongkong': {
+            name: 'HONGKONG',
+            code: 'p9494',
+            digits: 4
+        },
+
+        'kentucky-eve': {
+            name: 'KENTUCKYEVE POOL',
+            code: 'p9496',
+            digits: 4
+        },
+
+        'myanmar': {
+            name: 'MYANMAR POOL',
+            code: 'p9497',
+            digits: 4
+        },
+
+        'singapore': {
+            name: 'SINGAPORE POOL',
+            code: 'p9498',
+            digits: 4
+        },
+
+        'sydney': {
+            name: 'SYDNEY',
+            code: 'p9499',
+            digits: 4
+        },
+
+
+        // =============================================
+        // TOTO MACAU 4D
+        // =============================================
+
+        'totomacau-00': {
+            name: 'TOTO MACAU POOL',
+            code: 'm17',
+            slotHour: 0,
+            digits: 4
+        },
+
+        'totomacau-13': {
+            name: 'TOTO MACAU POOL',
+            code: 'm17',
+            slotHour: 13,
+            digits: 4
+        },
+
+        'totomacau-16': {
+            name: 'TOTO MACAU POOL',
+            code: 'm17',
+            slotHour: 16,
+            digits: 4
+        },
+
+        'totomacau-19': {
+            name: 'TOTO MACAU POOL',
+            code: 'm17',
+            slotHour: 19,
+            digits: 4
+        },
+
+        'totomacau-22': {
+            name: 'TOTO MACAU POOL',
+            code: 'm17',
+            slotHour: 22,
+            digits: 4
+        },
+
+        'totomacau-23': {
+            name: 'TOTO MACAU POOL',
+            code: 'm17',
+            slotHour: 23,
+            digits: 4
+        },
+
+
+        // =============================================
+        // OREGON
+        // =============================================
+
+        'oregon3': {
+            name: 'OREGON03 POOL',
+            code: 'p12531',
+            digits: 4
+        },
+
+        'oregon6': {
+            name: 'OREGON06 POOL',
+            code: 'p12534',
+            digits: 4
+        },
+
+        'oregon9': {
+            name: 'OREGON09 POOL',
+            code: 'p12535',
+            digits: 4
+        },
+
+        'oregon12': {
+            name: 'OREGON12 POOL',
+            code: 'p12536',
+            digits: 4
+        },
+
+
+        // =============================================
+        // SHANGHAI
+        // =============================================
+
+        'shanghai-mor': {
+            name: 'SHANGHAIMR POOL',
+            code: 'p13971',
+            digits: 4
+        },
+
+        'shanghai-night': {
+            name: 'SHANGHAINR POOL',
+            code: 'p13972',
+            digits: 4
+        },
+
+
+        // =============================================
+        // TORONTO
+        // =============================================
+
+        'toronto-mid': {
+            name: 'TORONTOMID POOL',
+            code: 'p13973',
+            digits: 4
+        },
+
+        'toronto-eve': {
+            name: 'TORONTOEVE POOL',
+            code: 'p13974',
+            digits: 4
+        },
+
+
+        'busan': {
+            name: 'BUSANPOOLS POOL',
+            code: 'p16066',
+            digits: 4
+        },
+
+        'chicago': {
+            name: 'CHICAGO POOL',
+            code: 'p16503',
+            digits: 4
+        },
+
+        'dallas': {
+            name: 'DALLAS POOL',
+            code: 'p21387',
+            digits: 4
+        },
+
+        'orlando': {
+            name: 'ORLANDO POOL',
+            code: 'p21388',
+            digits: 4
+        },
+
+        'jeju': {
+            name: 'JEJU POOL',
+            code: 'p22830',
+            digits: 4
+        },
+
+        'sapporo': {
+            name: 'SAPPORO POOL',
+            code: 'p22831',
+            digits: 4
+        },
+
+        'danang': {
+            name: 'DANANG POOL',
+            code: 'p22832',
+            digits: 4
+        },
+
+        'penang': {
+            name: 'PENANG POOL',
+            code: 'p22833',
+            digits: 4
+        },
+
+        'michigan': {
+            name: 'MICHIGAN POOL',
+            code: 'p23440',
+            digits: 4
+        },
+
+        'manhattan': {
+            name: 'MANHATTAN POOL',
+            code: 'p23441',
+            digits: 4
+        },
+
+        'colorado': {
+            name: 'COLORADO POOL',
+            code: 'p23442',
+            digits: 4
+        },
+
+        'montana': {
+            name: 'MONTANA POOL',
+            code: 'p23443',
+            digits: 4
+        },
+
+
+        // =============================================
+        // MIAMI
+        // =============================================
+
+        'miami-mid': {
+            name: 'MIAMIMID POOL',
+            code: 'p26485',
+            digits: 4
+        },
+
+        'miami-eve': {
+            name: 'MIAMIEVE POOL',
+            code: 'p26486',
+            digits: 4
+        },
+
+
+        // =============================================
+        // MAKATI
+        // =============================================
+
+        'makati-mor': {
+            name: 'MAKATIMR POOL',
+            code: 'p26487',
+            digits: 4
+        },
+
+        'makati-night': {
+            name: 'MAKATINR POOL',
+            code: 'p26488',
+            digits: 4
+        },
+
+
+        'beijing': {
+            name: 'BEIJING POOL',
+            code: 'p26489',
+            digits: 4
+        },
+
+        'guangzhou': {
+            name: 'GUANGZHOU POOL',
+            code: 'p26490',
+            digits: 4
+        },
+
+
+        // =============================================
+        // LOS ANGELES
+        // =============================================
+
+        'los-angeles-mid': {
+            name: 'LOSANGELMID POOL',
+            code: 'p26491',
+            digits: 4
+        },
+
+        'los-angeles-eve': {
+            name: 'LOSANGELEVE POOL',
+            code: 'p26492',
+            digits: 4
+        },
+
+
+        // =============================================
+        // WASHINGTON
+        // =============================================
+
+        'washington-mid': {
+            name: 'WASHINGMID POOL',
+            code: 'p26493',
+            digits: 4
+        },
+
+        'washington-eve': {
+            name: 'WASHINGEVE POOL',
+            code: 'p26494',
+            digits: 4
+        },
+
+
+        'batam': {
+            name: 'BATAM POOL',
+            code: 'p27669',
+            digits: 4
+        },
+
+        'osaka': {
+            name: 'OSAKA POOL',
+            code: 'p27774',
+            digits: 4
+        },
+
+        'ulanbator': {
+            name: 'ULANBATOR POOL',
+            code: 'p27775',
+            digits: 4
+        },
+
+        'phuket': {
+            name: 'PHUKET POOL',
+            code: 'p27786',
+            digits: 4
+        },
+
+        'seoul': {
+            name: 'SEOUL POOL',
+            code: 'p27796',
+            digits: 4
+        },
+
+        'johor': {
+            name: 'JOHOR POOL',
+            code: 'p27817',
+            digits: 4
+        },
+
+        'wuhan': {
+            name: 'WUHAN POOL',
+            code: 'p27862',
+            digits: 4
+        },
+
+        'siem-reap': {
+            name: 'SIEMREAP POOL',
+            code: 'p27868',
+            digits: 4
+        },
+
+        'taipei': {
+            name: 'TAIPEI POOL',
+            code: 'p28034',
+            digits: 4
+        },
+
+        'manila': {
+            name: 'MANILA POOL',
+            code: 'p28057',
+            digits: 4
+        },
+
+        'selangor': {
+            name: 'SELANGOR POOL',
+            code: 'p28058',
+            digits: 4
+        },
+
+
+        // =============================================
+        // TOTO MACAO 5D
+        // =============================================
+
+        'totomacau-15-5d': {
+            name: 'TOTO MACAO 5D',
+            code: 'm51',
+            slotHour: 15,
+            digits: 5
+        },
+
+        'totomacau-21-5d': {
+            name: 'TOTO MACAO 5D',
+            code: 'm51',
+            slotHour: 21,
+            digits: 5
+        },
+
+
+        // =============================================
+        // KING KONG 4D
+        // =============================================
+
+        'kingkong-17': {
+            name: 'KING KONG 4D',
+            code: 'm83',
+            slotHour: 17,
+            digits: 4
+        },
+
+        'kingkong-23': {
+            name: 'KING KONG 4D',
+            code: 'm83',
+            slotHour: 23,
+            digits: 4
+        }
+    };
+
+
+    // =========================================================
+    // STATE
+    // =========================================================
+
+    let running = false;
+
+    let activeJobId = null;
+
+    let finishedJobId = null;
+
+    let currentQueue = [];
+
+    let currentRunMode = 'manual';
+
+
+    // =========================================================
+    // HELPERS
+    // =========================================================
+
+    function sleep(ms) {
+
+        return new Promise(
+            resolve =>
+                setTimeout(
+                    resolve,
+                    ms
+                )
+        );
+    }
+
+
+    function normalize(text) {
+
+        return String(
+            text || ''
+        )
+        .toLowerCase()
+        .trim()
+        .replace(
+            /[_-]+/g,
+            ' '
+        )
+        .replace(
+            /[^a-z0-9 ]+/g,
+            ' '
+        )
+        .replace(
+            /\s+/g,
+            ' '
+        )
+        .trim();
+    }
+
+
+    function compact(text) {
+
+        return normalize(
+            text
+        )
+        .replace(
+            /\s+/g,
+            ''
+        );
+    }
+
+
+    function pad(number) {
+
+        return String(
+            number
+        )
+        .padStart(
+            2,
+            '0'
+        );
+    }
+
+
+    function dateToISO(date) {
+
+        return (
+
+            date.getFullYear()
+
+            +
+
+            '-'
+
+            +
+
+            pad(
+                date.getMonth() + 1
+            )
+
+            +
+
+            '-'
+
+            +
+
+            pad(
+                date.getDate()
+            )
+        );
+    }
+
+
+    function getTodayISO() {
+
+        return dateToISO(
+            new Date()
+        );
+    }
+
+
+    function getClock() {
+
+        const date =
+            new Date();
+
+
+        return (
+
+            pad(
+                date.getHours()
+            )
+
+            +
+
+            ':'
+
+            +
+
+            pad(
+                date.getMinutes()
+            )
+
+            +
+
+            ':'
+
+            +
+
+            pad(
+                date.getSeconds()
+            )
+        );
+    }
+
+
+    function makeResultKey(
+        market,
+        date
+    ) {
+
+        return (
+
+            normalize(
+                market
+            )
+
+            +
+
+            '|'
+
+            +
+
+            date
+        );
+    }
+
+
+    function expectedDigits(
+        market
+    ) {
+
+        return (
+
+            HISTORY_POOL[
+                market
+            ]?.digits
+
+            ||
+
+            4
+        );
+    }
+
+
+    function isValidNumber(
+        market,
+        value
+    ) {
+
+        const count =
+            expectedDigits(
+                market
+            );
+
+
+        return new RegExp(
+
+            `^\\d{${count}}$`
+
+        )
+        .test(
+            String(
+                value || ''
+            )
+            .trim()
+        );
+    }
+
+
+    function isPlaceholder(
+        value
+    ) {
+
+        const text =
+            String(
+                value || ''
+            )
+            .trim();
+
+
+        return (
+
+            /^x{4}$/i.test(
+                text
+            )
+
+            ||
+
+            /^x{5}$/i.test(
+                text
+            )
+
+            ||
+
+            text === ''
+        );
+    }
+
+
+    // =========================================================
+    // SITE CHECK
+    // =========================================================
+
+    function isZPanel() {
+
+        return (
+
+            location.hostname ===
+                'pian.prediksi-tokek.com'
+
+            &&
+
+            location.pathname
+                .endsWith(
+                    '/dashboard.php'
+                )
+
+            &&
+
+            new URLSearchParams(
+                location.search
+            )
+            .get(
+                'hal'
+            ) ===
+                'result'
+        );
+    }
+
+
+    function isHistorySite() {
+
+        return (
+
+            location.hostname ===
+                'hujan39.store'
+
+            ||
+
+            location.hostname
+                .endsWith(
+                    '.hujan39.store'
+                )
+        );
+    }
+
+
+    // =========================================================
+    // SET FORM VALUE
+    // =========================================================
+
+    function setValue(
+        element,
+        value
+    ) {
+
+        if (!element) {
+            return;
+        }
+
+
+        const proto =
+
+            element instanceof
+                HTMLSelectElement
+
+                ? HTMLSelectElement.prototype
+
+                : HTMLInputElement.prototype;
+
+
+        const setter =
+
+            Object
+            .getOwnPropertyDescriptor(
+                proto,
+                'value'
+            )
+            ?.set;
+
+
+        if (setter) {
+
+            setter.call(
+                element,
+                value
+            );
+
+        } else {
+
+            element.value =
+                value;
+        }
+
+
+        element.dispatchEvent(
+
+            new Event(
+                'input',
+                {
+                    bubbles:
+                        true
+                }
+            )
+        );
+
+
+        element.dispatchEvent(
+
+            new Event(
+                'change',
+                {
+                    bubbles:
+                        true
+                }
+            )
+        );
+    }
+
+
+    // =========================================================
+    // TANGGAL ZPANEL
+    //
+    // contoh:
+    // 10 Sep 2026 | 00:18:34
+    // =========================================================
+
+    function parsePanelDateTime(
+        text
+    ) {
+
+        const match =
+
+            String(
+                text || ''
+            )
+            .match(
+
+                /\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\s*\|\s*(\d{1,2}):(\d{2}):(\d{2})\b/i
+            );
+
+
+        if (!match) {
+
+            return null;
+        }
+
+
+        const months = {
+
+            jan: 0,
+            feb: 1,
+            mar: 2,
+            apr: 3,
+            may: 4,
+            jun: 5,
+            jul: 6,
+            aug: 7,
+            sep: 8,
+            oct: 9,
+            nov: 10,
+            dec: 11
+        };
+
+
+        const month =
+
+            months[
+                match[2]
+                .toLowerCase()
+            ];
+
+
+        if (
+            month ===
+            undefined
+        ) {
+
+            return null;
+        }
+
+
+        return new Date(
+
+            Number(
+                match[3]
+            ),
+
+            month,
+
+            Number(
+                match[1]
+            ),
+
+            Number(
+                match[4]
+            ),
+
+            Number(
+                match[5]
+            ),
+
+            Number(
+                match[6]
+            )
+        );
+    }
+
+
+    function isPanelRowInCurrentRange(
+        date
+    ) {
+
+        if (
+
+            !(
+                date instanceof Date
+            )
+
+            ||
+
+            Number.isNaN(
+                date.getTime()
+            )
+        ) {
+
+            return false;
+        }
+
+
+        const now =
+            new Date();
+
+
+        const start =
+            new Date(
+
+                now.getFullYear(),
+
+                now.getMonth(),
+
+                now.getDate(),
+
+                0,
+                0,
+                0,
+                0
+            );
+
+
+        return (
+
+            date >= start
+
+            &&
+
+            date <= now
+        );
+    }
+
+
+    // =========================================================
+    // ROW ZPANEL
+    // =========================================================
+
+    function getResultRows() {
+
+        return [
+
+            ...document.querySelectorAll(
+                'table tbody tr'
+            )
+
+        ]
+        .filter(
+
+            row =>
+                row.querySelector(
+                    'input[name="updangka"]'
+                )
+        );
+    }
+
+
+    function getMarketFromRow(
+        row
+    ) {
+
+        const marketCell =
+
+            row.querySelector(
+                'td.text-uppercase'
+            );
+
+
+        if (marketCell) {
+
+            const text =
+                compact(
+                    marketCell.textContent
+                );
+
+
+            const exact =
+
+                PASARAN.find(
+
+                    market =>
+                        compact(
+                            market
+                        ) ===
+                        text
+                );
+
+
+            if (exact) {
+
+                return exact;
+            }
+        }
+
+
+        const image =
+
+            row.querySelector(
+                'img[src*="icon-market/"]'
+            );
+
+
+        if (image) {
+
+            const source =
+
+                String(
+
+                    image.getAttribute(
+                        'src'
+                    )
+
+                    ||
+
+                    ''
+                );
+
+
+            const match =
+
+                source.match(
+
+                    /icon-market\/([^/?]+)\.(?:png|jpg|jpeg|webp)/i
+                );
+
+
+            if (match) {
+
+                const candidate =
+
+                    match[1]
+                    .toLowerCase();
+
+
+                if (
+
+                    PASARAN.includes(
+                        candidate
+                    )
+
+                ) {
+
+                    return candidate;
+                }
+            }
+        }
+
+
+        const rowText =
+
+            compact(
+                row.textContent
+            );
+
+
+        return (
+
+            PASARAN.find(
+
+                market =>
+
+                    rowText.includes(
+                        compact(
+                            market
+                        )
+                    )
+            )
+
+            ||
+
+            null
+        );
+    }
+
+
+    function getRowId(
+        row
+    ) {
+
+        const updateForm =
+
+            row.querySelector(
+
+                'form[action*="update-resultlotto.php"]'
+            );
+
+
+        if (updateForm) {
+
+            const match =
+
+                String(
+
+                    updateForm
+                    .getAttribute(
+                        'action'
+                    )
+
+                    ||
+
+                    ''
+                )
+                .match(
+
+                    /[?&]row=(\d+)/i
+                );
+
+
+            if (match) {
+
+                return match[1];
+            }
+        }
+
+
+        const deleteLink =
+
+            row.querySelector(
+
+                'a[href*="delresult.php"][href*="row="]'
+            );
+
+
+        if (deleteLink) {
+
+            const match =
+
+                String(
+
+                    deleteLink
+                    .getAttribute(
+                        'href'
+                    )
+
+                    ||
+
+                    ''
+                )
+                .match(
+
+                    /[?&]row=(\d+)/i
+                );
+
+
+            if (match) {
+
+                return match[1];
+            }
+        }
+
+
+        return null;
+    }
+
+
+    function getRowInfo(
+        row
+    ) {
+
+        const market =
+            getMarketFromRow(
+                row
+            );
+
+
+        const input =
+
+            row.querySelector(
+                'input[name="updangka"]'
+            );
+
+
+        const dateTime =
+
+            parsePanelDateTime(
+                row.textContent
+            );
+
+
+        return {
+
+            row,
+
+            market,
+
+            input,
+
+            value:
+
+                input
+
+                    ? String(
+                        input.value || ''
+                    )
+                    .trim()
+
+                    : '',
+
+
+            dateTime,
+
+
+            dateISO:
+
+                dateTime
+
+                    ? dateToISO(
+                        dateTime
+                    )
+
+                    : null,
+
+
+            rowId:
+
+                getRowId(
+                    row
+                )
+        };
+    }
+
+
+    function getTodayPanelRows() {
+
+        return getResultRows()
+
+            .map(
+                getRowInfo
+            )
+
+            .filter(
+
+                item =>
+
+                    item.market
+
+                    &&
+
+                    item.dateTime
+
+                    &&
+
+                    item.dateISO
+
+                    &&
+
+                    isPanelRowInCurrentRange(
+                        item.dateTime
+                    )
+            );
+    }
+
+
+    function getReadyRows() {
+
+        return getTodayPanelRows()
+
+            .filter(
+
+                item => {
+
+                    if (
+
+                        isValidNumber(
+                            item.market,
+                            item.value
+                        )
+
+                    ) {
+
+                        return false;
+                    }
+
+
+                    return isPlaceholder(
+                        item.value
+                    );
+                }
+            );
+    }
+
+
+    // =========================================================
+    // STATUS
+    // =========================================================
+
+    function setStatus(
+        message
+    ) {
+
+        const box =
+
+            document.querySelector(
+                '#pian105-status'
+            );
+
+
+        if (box) {
+
+            box.textContent =
+                message;
+        }
+
+
+        console.log(
+            '[PIAN105]',
+            message
+        );
+    }
+
+
+    // =========================================================
+    // HISTORY CONNECTION
+    // =========================================================
+
+    function isHistoryConnected() {
+
+        const heartbeat =
+
+            Number(
+
+                GM_getValue(
+                    K.beat,
+                    0
+                )
+            );
+
+
+        return (
+
+            Date.now()
+
+            -
+
+            heartbeat
+
+            <
+
+            7000
+        );
+    }
+
+
+    function refreshInfo() {
+
+        const rows =
+            getTodayPanelRows();
+
+
+        const done =
+
+            rows.filter(
+
+                item =>
+
+                    isValidNumber(
+                        item.market,
+                        item.value
+                    )
+            );
+
+
+        const pending =
+
+            rows.filter(
+
+                item =>
+
+                    !isValidNumber(
+                        item.market,
+                        item.value
+                    )
+
+                    &&
+
+                    isPlaceholder(
+                        item.value
+                    )
+            );
+
+
+        const count =
+
+            document.querySelector(
+                '#pian105-count'
+            );
+
+
+        if (count) {
+
+            count.innerHTML =
+
+                `Rentang: <b>00:00:00 → ${getClock()}</b>`
+
+                +
+
+                `<br>Row hari ini: <b>${rows.length}</b>`
+
+                +
+
+                `<br>Sudah valid: <b>${done.length}</b>`
+
+                +
+
+                ` | Menunggu: <b>${pending.length}</b>`;
+        }
+
+
+        const history =
+
+            document.querySelector(
+                '#pian105-history'
+            );
+
+
+        if (history) {
+
+            if (
+                isHistoryConnected()
+            ) {
+
+                history.textContent =
+                    '✅ HISTORY HUJAN39 CONNECTED';
+
+                history.style.color =
+                    '#8ce99a';
+
+            } else {
+
+                history.textContent =
+                    '⚠️ HISTORY HUJAN39 BELUM TERHUBUNG';
+
+                history.style.color =
+                    '#ffd166';
+            }
+        }
+
+
+        refreshAutoUI();
+    }
+
+
+    // =========================================================
+    // STEP 1
+    // TAMBAH PASARAN
+    // =========================================================
+
+    function getAddForm() {
+
+        const pasaran =
+
+            document.querySelector(
+                'select[name="preresult"]'
+            );
+
+
+        const angka =
+
+            document.querySelector(
+                'input[name="angkaresult"]'
+            );
+
+
+        const tanggal =
+
+            document.querySelector(
+                'input[name="jamresult"]'
+            );
+
+
+        const form =
+
+            pasaran
+
+                ? pasaran.closest(
+                    'form'
+                )
+
+                : null;
+
+
+        return {
+
+            pasaran,
+            angka,
+            tanggal,
+            form
+        };
+    }
+
+
+    function findZOption(
+        select,
+        market
+    ) {
+
+        if (!select) {
+
+            return null;
+        }
+
+
+        return (
+
+            [
+                ...select.options
+            ]
+            .find(
+
+                option =>
+
+                    compact(
+                        option.value
+                    ) ===
+                    compact(
+                        market
+                    )
+
+                    ||
+
+                    compact(
+                        option.textContent
+                    ) ===
+                    compact(
+                        market
+                    )
+            )
+
+            ||
+
+            null
+        );
+    }
+
+
+    async function startAddMarkets() {
+
+        if (running) {
+
+            setStatus(
+                '⚠️ Proses lain sedang berjalan'
+            );
+
+            return;
+        }
+
+
+        const formData =
+            getAddForm();
+
+
+        if (
+
+            !formData.pasaran
+
+            ||
+
+            !formData.angka
+
+            ||
+
+            !formData.tanggal
+
+            ||
+
+            !formData.form
+        ) {
+
+            setStatus(
+                '❌ Form Tambah Manual tidak ditemukan'
+            );
+
+            return;
+        }
+
+
+        const existing =
+
+            new Set(
+
+                getTodayPanelRows()
+
+                .map(
+
+                    item =>
+                        item.market
+                )
+            );
+
+
+        const queue =
+            [];
+
+
+        for (
+            const market
+            of PASARAN
+        ) {
+
+            const option =
+
+                findZOption(
+                    formData.pasaran,
+                    market
+                );
+
+
+            if (
+
+                option
+
+                &&
+
+                !existing.has(
+                    market
+                )
+            ) {
+
+                queue.push({
+
+                    market,
+
+                    option
+                });
+            }
+        }
+
+
+        if (!queue.length) {
+
+            setStatus(
+                '✅ Semua pasaran hari ini sudah ada'
+            );
+
+            return;
+        }
+
+
+        const confirmed =
+
+            confirm(
+
+                `STEP 1 - TAMBAH PASARAN\n\n`
+
+                +
+
+                `Belum ada: ${queue.length}\n`
+
+                +
+
+                `Angka awal: XXXX\n`
+
+                +
+
+                `Tanggal: ${getTodayISO()}\n\n`
+
+                +
+
+                `Lanjutkan?`
+            );
+
+
+        if (!confirmed) {
+
+            return;
+        }
+
+
+        running =
+            true;
+
+
+        for (
+
+            let i = 0;
+
+            i < queue.length;
+
+            i++
+        ) {
+
+            if (!running) {
+
+                break;
+            }
+
+
+            const item =
+                queue[i];
+
+
+            setValue(
+                formData.pasaran,
+                item.option.value
+            );
+
+
+            setValue(
+                formData.angka,
+                'xxxx'
+            );
+
+
+            setValue(
+                formData.tanggal,
+                getTodayISO()
+            );
+
+
+            const data =
+
+                new FormData(
+                    formData.form
+                );
+
+
+            setStatus(
+
+                `➕ [${i + 1}/${queue.length}] `
+
+                +
+
+                `${item.market} → XXXX`
+            );
+
+
+            try {
+
+                const response =
+
+                    await fetch(
+
+                        formData.form.action,
+
+                        {
+                            method:
+                                'POST',
+
+                            body:
+                                data,
+
+                            credentials:
+                                'same-origin'
+                        }
+                    );
+
+
+                console.log(
+
+                    '[PIAN105 ADD]',
+
+                    item.market,
+
+                    response.status
+                );
+
+
+            } catch (error) {
+
+                console.error(
+
+                    '[PIAN105 ADD ERROR]',
+
+                    item.market,
+
+                    error
+                );
+            }
+
+
+            await sleep(
+                ADD_DELAY
+            );
+        }
+
+
+        running =
+            false;
+
+
+        setStatus(
+            '✅ STEP 1 selesai. Reload halaman...'
+        );
+
+
+        setTimeout(
+
+            () =>
+                location.reload(),
+
+            1000
+        );
+    }
+
+
+    // =========================================================
+    // HISTORY POOL DINAMIS
+    // =========================================================
+
+    function getDynamicPoolMap() {
+
+        const map =
+            {};
+
+
+        document
+        .querySelectorAll(
+
+            '#pool-name option[data-code], option[data-name][data-code]'
+        )
+        .forEach(
+
+            option => {
+
+                const name =
+
+                    option.getAttribute(
+                        'data-name'
+                    )
+
+                    ||
+
+                    option.textContent;
+
+
+                const code =
+
+                    option.getAttribute(
+                        'data-code'
+                    );
+
+
+                if (
+                    !name
+                    ||
+                    !code
+                ) {
+
+                    return;
+                }
+
+
+                map[
+                    compact(
+                        name
+                    )
+                ] = {
+
+                    name:
+                        String(
+                            name
+                        )
+                        .trim(),
+
+                    code:
+                        String(
+                            code
+                        )
+                        .trim()
+                };
+            }
+        );
+
+
+        return map;
+    }
+
+
+    function resolveHistoryConfig(
+        market
+    ) {
+
+        const base =
+
+            HISTORY_POOL[
+                market
+            ];
+
+
+        if (!base) {
+
+            return null;
+        }
+
+
+        const dynamicMap =
+            getDynamicPoolMap();
+
+
+        const dynamic =
+
+            dynamicMap[
+                compact(
+                    base.name
+                )
+            ];
+
+
+        if (dynamic) {
+
+            return {
+
+                ...base,
+
+                name:
+                    dynamic.name,
+
+                code:
+                    dynamic.code
+            };
+        }
+
+
+        return {
+            ...base
+        };
+    }
+
+
+    // =========================================================
+    // HISTORY DATETIME
+    // =========================================================
+
+    function parseHistoryDateTime(
+        text
+    ) {
+
+        const match =
+
+            String(
+                text || ''
+            )
+            .match(
+
+                /(\d{4})-(\d{2})-(\d{2})\s*(?:\|\s*)?(\d{1,2}):(\d{2}):(\d{2})/
+            );
+
+
+        if (!match) {
+
+            return null;
+        }
+
+
+        return {
+
+            date:
+
+                `${match[1]}-${match[2]}-${match[3]}`,
+
+
+            hour:
+
+                Number(
+                    match[4]
+                ),
+
+
+            minute:
+
+                Number(
+                    match[5]
+                ),
+
+
+            second:
+
+                Number(
+                    match[6]
+                )
+        };
+    }
+
+
+    function historyToDate(
+        history
+    ) {
+
+        if (!history) {
+
+            return null;
+        }
+
+
+        const date =
+
+            new Date(
+
+                `${history.date}T`
+
+                +
+
+                `${pad(history.hour)}:`
+
+                +
+
+                `${pad(history.minute)}:`
+
+                +
+
+                `${pad(history.second)}`
+            );
+
+
+        if (
+            Number.isNaN(
+                date.getTime()
+            )
+        ) {
+
+            return null;
+        }
+
+
+        return date;
+    }
+
+
+    // =========================================================
+    // EXTRACT RESULT HISTORY
+    //
+    // PENGAMAN:
+    // 1 tanggal harus sama
+    // 2 jam History tidak boleh di masa depan
+    // 3 slot TOTO/5D/KINGKONG harus sama
+    // 4 digit wajib benar
+    // 5 pilih result terbaru yang valid
+    // =========================================================
+
+    function extractResultFromHistoryHTML(
+        html,
+        market,
+        panelDate,
+        config
+    ) {
+
+        if (
+            !config
+            ||
+            !config.code
+        ) {
+
+            return null;
+        }
+
+
+        const doc =
+
+            new DOMParser()
+            .parseFromString(
+                html,
+                'text/html'
+            );
+
+
+        const now =
+            new Date();
+
+
+        const candidates =
+            [];
+
+
+        const tables =
+
+            [
+                ...doc.querySelectorAll(
+                    'table'
+                )
+            ];
+
+
+        for (
+            const table
+            of tables
+        ) {
+
+            const headerRow =
+
+                table.querySelector(
+                    'thead tr'
+                )
+
+                ||
+
+                table.querySelector(
+                    'tr'
+                );
+
+
+            if (!headerRow) {
+
+                continue;
+            }
+
+
+            const headers =
+
+                [
+                    ...headerRow.querySelectorAll(
+                        'th,td'
+                    )
+                ]
+                .map(
+
+                    cell =>
+
+                        normalize(
+                            cell.textContent
+                        )
+                );
+
+
+            const dateIndex =
+
+                headers.findIndex(
+
+                    header =>
+
+                        header ===
+                            'tanggal'
+
+                        ||
+
+                        header ===
+                            'date'
+                );
+
+
+            let numberIndex =
+
+                headers.findIndex(
+
+                    header =>
+
+                        header ===
+                            'nomor'
+
+                        ||
+
+                        header ===
+                            'number'
+                );
+
+
+            if (
+                numberIndex ===
+                -1
+            ) {
+
+                numberIndex =
+
+                    headers.findIndex(
+
+                        header => {
+
+                            const h =
+                                compact(
+                                    header
+                                );
+
+
+                            return (
+
+                                h ===
+                                    'nomor1'
+
+                                ||
+
+                                h ===
+                                    'number1'
+
+                                ||
+
+                                h ===
+                                    'prize1'
+
+                                ||
+
+                                h ===
+                                    'firstprize'
+                            );
+                        }
+                    );
+            }
+
+
+            if (
+
+                dateIndex ===
+                    -1
+
+                ||
+
+                numberIndex ===
+                    -1
+            ) {
+
+                continue;
+            }
+
+
+            const rows =
+
+                [
+                    ...table.querySelectorAll(
+                        'tbody tr'
+                    )
+                ];
+
+
+            for (
+                const row
+                of rows
+            ) {
+
+                const cells =
+
+                    [
+                        ...row.querySelectorAll(
+                            'td'
+                        )
+                    ];
+
+
+                if (
+
+                    !cells[
+                        dateIndex
+                    ]
+
+                    ||
+
+                    !cells[
+                        numberIndex
+                    ]
+                ) {
+
+                    continue;
+                }
+
+
+                const historyTime =
+
+                    parseHistoryDateTime(
+
+                        cells[
+                            dateIndex
+                        ].textContent
+                    );
+
+
+                if (!historyTime) {
+
+                    continue;
+                }
+
+
+                // =============================================
+                // TANGGAL HARUS SAMA DENGAN PANEL
+                // =============================================
+
+                if (
+
+                    historyTime.date !==
+                    panelDate
+
+                ) {
+
+                    continue;
+                }
+
+
+                const fullDate =
+
+                    historyToDate(
+                        historyTime
+                    );
+
+
+                if (!fullDate) {
+
+                    continue;
+                }
+
+
+                // =============================================
+                // JANGAN AMBIL RESULT WAKTU MASA DEPAN
+                // =============================================
+
+                if (
+                    fullDate >
+                    now
+                ) {
+
+                    console.warn(
+
+                        '[PIAN105 FUTURE BLOCK]',
+
+                        market,
+
+                        historyTime
+                    );
+
+
+                    continue;
+                }
+
+
+                // =============================================
+                // SLOT JAM KHUSUS
+                // =============================================
+
+                if (
+
+                    Number.isInteger(
+                        config.slotHour
+                    )
+
+                    &&
+
+                    historyTime.hour !==
+                        config.slotHour
+                ) {
+
+                    continue;
+                }
+
+
+                const numberText =
+
+                    String(
+
+                        cells[
+                            numberIndex
+                        ].textContent
+
+                        ||
+
+                        ''
+                    )
+
+                    .replace(
+                        /\s+/g,
+                        ''
+                    )
+
+                    .trim();
+
+
+                const regex =
+
+                    new RegExp(
+
+                        `(?:^|\\D)(\\d{${config.digits}})(?:\\D|$)`
+                    );
+
+
+                const numberMatch =
+
+                    numberText.match(
+                        regex
+                    );
+
+
+                if (!numberMatch) {
+
+                    continue;
+                }
+
+
+                const result =
+                    numberMatch[1];
+
+
+                if (
+
+                    !isValidNumber(
+                        market,
+                        result
+                    )
+
+                ) {
+
+                    continue;
+                }
+
+
+                candidates.push({
+
+                    number:
+                        result,
+
+                    historyDate:
+                        historyTime.date,
+
+                    historyHour:
+                        historyTime.hour,
+
+                    historyMinute:
+                        historyTime.minute,
+
+                    historySecond:
+                        historyTime.second,
+
+                    historyTime:
+
+                        `${pad(historyTime.hour)}:`
+
+                        +
+
+                        `${pad(historyTime.minute)}:`
+
+                        +
+
+                        `${pad(historyTime.second)}`,
+
+
+                    timestamp:
+
+                        fullDate.getTime()
+                });
+            }
+        }
+
+
+        if (
+            !candidates.length
+        ) {
+
+            return null;
+        }
+
+
+        // result paling baru yang benar
+
+        candidates.sort(
+
+            (
+                a,
+                b
+            ) =>
+
+                b.timestamp
+
+                -
+
+                a.timestamp
+        );
+
+
+        return candidates[0];
+    }
+
+
+    // =========================================================
+    // HISTORY HEARTBEAT
+    // =========================================================
+
+    function startHeartbeat() {
+
+        GM_setValue(
+            K.beat,
+            Date.now()
+        );
+
+
+        setInterval(
+
+            function () {
+
+                GM_setValue(
+                    K.beat,
+                    Date.now()
+                );
+
+            },
+
+            2000
+        );
+    }
+
+
+    // =========================================================
+    // FETCH ENDPOINT HISTORY
+    // =========================================================
+
+    async function fetchHistoryPool(
+        code
+    ) {
+
+        const url =
+
+            `/history/result/${encodeURIComponent(code)}/kosong`;
+
+
+        const response =
+
+            await fetch(
+
+                url,
+
+                {
+                    method:
+                        'GET',
+
+                    credentials:
+                        'same-origin',
+
+                    cache:
+                        'no-store'
+                }
+            );
+
+
+        if (
+            !response.ok
+        ) {
+
+            throw new Error(
+
+                `History HTTP ${response.status}`
+            );
+        }
+
+
+        return await response.text();
+    }
+
+
+    // =========================================================
+    // HISTORY JOB
+    // =========================================================
+
+    async function runHistoryJob(
+        command
+    ) {
+
+        if (
+
+            !command
+
+            ||
+
+            !command.id
+
+            ||
+
+            !Array.isArray(
+                command.targets
+            )
+        ) {
+
+            return;
+        }
+
+
+        const numbers =
+            {};
+
+
+        const missing =
+            {};
+
+
+        const htmlCache =
+            {};
+
+
+        for (
+
+            let i = 0;
+
+            i <
+            command.targets.length;
+
+            i++
+        ) {
+
+            if (
+
+                GM_getValue(
+                    K.stop,
+                    ''
+                )
+
+                ===
+
+                command.id
+            ) {
+
+                GM_setValue(
+
+                    K.status,
+
+                    {
+                        jobId:
+                            command.id,
+
+                        status:
+                            'stopped'
+                    }
+                );
+
+
+                return;
+            }
+
+
+            const target =
+                command.targets[i];
+
+
+            const market =
+                target.market;
+
+
+            const panelDate =
+                target.date;
+
+
+            const config =
+
+                resolveHistoryConfig(
+                    market
+                );
+
+
+            GM_setValue(
+
+                K.status,
+
+                {
+                    jobId:
+                        command.id,
+
+                    status:
+                        'syncing',
+
+                    current:
+                        i + 1,
+
+                    total:
+                        command.targets.length,
+
+                    market,
+
+                    date:
+                        panelDate,
+
+                    pool:
+                        config?.name,
+
+                    code:
+                        config?.code
+                }
+            );
+
+
+            if (
+
+                !config
+
+                ||
+
+                !config.code
+            ) {
+
+                missing[
+                    makeResultKey(
+                        market,
+                        panelDate
+                    )
+                ] = {
+
+                    market,
+
+                    date:
+                        panelDate,
+
+                    reason:
+                        'mapping_tidak_tersedia'
+                };
+
+
+                continue;
+            }
+
+
+            try {
+
+                if (
+
+                    !htmlCache[
+                        config.code
+                    ]
+                ) {
+
+                    htmlCache[
+                        config.code
+                    ] =
+
+                        await fetchHistoryPool(
+                            config.code
+                        );
+                }
+
+
+                const matched =
+
+                    extractResultFromHistoryHTML(
+
+                        htmlCache[
+                            config.code
+                        ],
+
+                        market,
+
+                        panelDate,
+
+                        config
+                    );
+
+
+                if (matched) {
+
+                    const key =
+
+                        makeResultKey(
+                            market,
+                            panelDate
+                        );
+
+
+                    numbers[
+                        key
+                    ] = {
+
+                        number:
+                            matched.number,
+
+                        date:
+                            matched.historyDate,
+
+                        hour:
+                            matched.historyHour,
+
+                        minute:
+                            matched.historyMinute,
+
+                        second:
+                            matched.historySecond,
+
+                        time:
+                            matched.historyTime,
+
+                        pool:
+                            config.name,
+
+                        code:
+                            config.code
+                    };
+
+
+                    console.log(
+
+                        '[PIAN105 HISTORY MATCH]',
+
+                        market,
+
+                        config.name,
+
+                        config.code,
+
+                        panelDate,
+
+                        matched.historyTime,
+
+                        '→',
+
+                        matched.number
+                    );
+
+
+                } else {
+
+                    missing[
+                        makeResultKey(
+                            market,
+                            panelDate
+                        )
+                    ] = {
+
+                        market,
+
+                        date:
+                            panelDate,
+
+                        pool:
+                            config.name,
+
+                        code:
+                            config.code,
+
+                        reason:
+                            'belum_ada_result_cocok'
+                    };
+                }
+
+
+            } catch (error) {
+
+                missing[
+                    makeResultKey(
+                        market,
+                        panelDate
+                    )
+                ] = {
+
+                    market,
+
+                    date:
+                        panelDate,
+
+                    pool:
+                        config.name,
+
+                    code:
+                        config.code,
+
+                    reason:
+                        error.message
+                };
+
+
+                console.error(
+
+                    '[PIAN105 HISTORY ERROR]',
+
+                    market,
+
+                    config,
+
+                    error
+                );
+            }
+
+
+            GM_setValue(
+
+                K.data,
+
+                {
+                    jobId:
+                        command.id,
+
+                    numbers,
+
+                    missing,
+
+                    updatedAt:
+                        Date.now()
+                }
+            );
+
+
+            await sleep(
+                120
+            );
+        }
+
+
+        GM_setValue(
+
+            K.data,
+
+            {
+                jobId:
+                    command.id,
+
+                numbers,
+
+                missing,
+
+                updatedAt:
+                    Date.now()
+            }
+        );
+
+
+        GM_setValue(
+
+            K.status,
+
+            {
+                jobId:
+                    command.id,
+
+                status:
+                    'done',
+
+                found:
+                    Object.keys(
+                        numbers
+                    ).length,
+
+                missing:
+                    Object.keys(
+                        missing
+                    ).length
+            }
+        );
+    }
+
+
+    // =========================================================
+    // HISTORY INIT
+    // =========================================================
+
+    function initHistorySite() {
+
+        startHeartbeat();
+
+
+        GM_addValueChangeListener(
+
+            K.cmd,
+
+            function (
+                name,
+                oldValue,
+                newValue
+            ) {
+
+                if (
+
+                    newValue
+
+                    &&
+
+                    newValue.action ===
+                        'get_panel_results'
+                ) {
+
+                    runHistoryJob(
+                        newValue
+                    );
+                }
+            }
+        );
+
+
+        const command =
+
+            GM_getValue(
+                K.cmd,
+                null
+            );
+
+
+        if (
+
+            command
+
+            &&
+
+            command.action ===
+                'get_panel_results'
+        ) {
+
+            setTimeout(
+
+                function () {
+
+                    runHistoryJob(
+                        command
+                    );
+
+                },
+
+                800
+            );
+        }
+
+
+        createHistoryMiniPanel();
+    }
+
+
+    // =========================================================
+    // MINI PANEL HISTORY
+    // =========================================================
+
+    function createHistoryMiniPanel() {
+
+        if (
+
+            document.querySelector(
+                '#pian105-history-mini'
+            )
+
+        ) {
+
+            return;
+        }
+
+
+        const panel =
+
+            document.createElement(
+                'div'
+            );
+
+
+        panel.id =
+            'pian105-history-mini';
+
+
+        panel.innerHTML = `
+
+            <b>
+                🌧️ HUJAN39 HISTORY BRIDGE V${VERSION}
+            </b>
+
+            <div style="
+                margin-top:6px;
+                color:#8ce99a;
+            ">
+                ✅ CONNECTED
+            </div>
+
+            <div style="
+                margin-top:4px;
+            ">
+                Dynamic Pool Mapping
+            </div>
+
+            <div style="
+                margin-top:4px;
+                color:#ffd166;
+            ">
+                Date + Time Safety ON
+            </div>
+        `;
+
+
+        panel.style.cssText = `
+
+            position:fixed;
+
+            right:12px;
+            bottom:12px;
+
+            z-index:2147483647;
+
+            width:220px;
+
+            padding:10px;
+
+            background:#111;
+
+            color:#fff;
+
+            border:1px solid #555;
+
+            border-radius:6px;
+
+            font:11px Arial,sans-serif;
+        `;
+
+
+        document.body.appendChild(
+            panel
+        );
+    }
+
+
+    // =========================================================
+    // QUEUE
+    // =========================================================
+
+    function buildResultQueue() {
+
+        const ready =
+            getReadyRows();
+
+
+        const order =
+
+            new Map(
+
+                PASARAN.map(
+
+                    (
+                        market,
+                        index
+                    ) => [
+
+                        market,
+
+                        index
+                    ]
+                )
+            );
+
+
+        return ready.sort(
+
+            (
+                a,
+                b
+            ) =>
+
+                (
+                    order.get(
+                        a.market
+                    )
+
+                    ??
+
+                    9999
+                )
+
+                -
+
+                (
+                    order.get(
+                        b.market
+                    )
+
+                    ??
+
+                    9999
+                )
+        );
+    }
+
+
+    // =========================================================
+    // START INPUT
+    // =========================================================
+
+    async function startInputResults(
+        mode = 'manual'
+    ) {
+
+        if (running) {
+
+            if (
+                mode ===
+                'manual'
+            ) {
+
+                setStatus(
+                    '⚠️ Proses lain sedang berjalan'
+                );
+            }
+
+
+            return false;
+        }
+
+
+        currentQueue =
+            buildResultQueue();
+
+
+        if (
+            !currentQueue.length
+        ) {
+
+            setStatus(
+                '✅ Tidak ada result yang menunggu'
+            );
+
+
+            return false;
+        }
+
+
+        if (
+            mode ===
+            'manual'
+        ) {
+
+            const confirmed =
+
+                confirm(
+
+                    `CEK & INPUT RESULT\n\n`
+
+                    +
+
+                    `Menunggu: ${currentQueue.length}\n\n`
+
+                    +
+
+                    `HUJAN39 wajib cocok dengan ZPanel PIAN.\n`
+
+                    +
+
+                    `Tanggal wajib sama.\n`
+
+                    +
+
+                    `Result masa depan diblokir.\n`
+
+                    +
+
+                    `Slot Toto Macau / 5D / KingKong divalidasi.\n\n`
+
+                    +
+
+                    `Lanjutkan?`
+                );
+
+
+            if (!confirmed) {
+
+                return false;
+            }
+        }
+
+
+        running =
+            true;
+
+
+        currentRunMode =
+            mode;
+
+
+        finishedJobId =
+            null;
+
+
+        activeJobId =
+
+            'PIAN105-'
+
+            +
+
+            Date.now()
+
+            +
+
+            '-'
+
+            +
+
+            Math.random()
+            .toString(
+                36
+            )
+            .slice(
+                2,
+                7
+            );
+
+
+        GM_setValue(
+            K.stop,
+            ''
+        );
+
+
+        GM_setValue(
+
+            K.data,
+
+            {
+                jobId:
+                    activeJobId,
+
+                numbers:
+                    {},
+
+                missing:
+                    {}
+            }
+        );
+
+
+        const targets =
+
+            currentQueue.map(
+
+                item => ({
+
+                    market:
+                        item.market,
+
+                    date:
+                        item.dateISO
+                })
+            );
+
+
+        GM_setValue(
+
+            K.cmd,
+
+            {
+                id:
+                    activeJobId,
+
+                action:
+                    'get_panel_results',
+
+                mode,
+
+                targets,
+
+                createdAt:
+                    Date.now()
+            }
+        );
+
+
+        setStatus(
+
+            mode ===
+                'auto'
+
+                ?
+
+                `🤖 AUTO CHECK — mencari ${targets.length} History...`
+
+                :
+
+                `🌧️ Mencari ${targets.length} result di HUJAN39...`
+        );
+
+
+        if (
+            !isHistoryConnected()
+        ) {
+
+            try {
+
+                GM_openInTab(
+
+                    HISTORY_URL,
+
+                    {
+                        active:
+                            false,
+
+                        insert:
+                            true,
+
+                        setParent:
+                            true
+                    }
+                );
+
+
+            } catch (error) {
+
+                window.open(
+                    HISTORY_URL,
+                    '_blank'
+                );
+            }
+        }
+
+
+        return true;
+    }
+
+
+    // =========================================================
+    // UPDATE ZPANEL
+    // =========================================================
+
+    async function updatePanelRow(
+        item,
+        number
+    ) {
+
+        if (
+            !item.rowId
+        ) {
+
+            throw new Error(
+                'row ID tidak ditemukan'
+            );
+        }
+
+
+        if (
+
+            !isValidNumber(
+                item.market,
+                number
+            )
+
+        ) {
+
+            throw new Error(
+
+                `digit result tidak valid: ${number}`
+            );
+        }
+
+
+        const url =
+
+            new URL(
+
+                `/config/update-resultlotto.php?row=${encodeURIComponent(item.rowId)}`,
+
+                location.origin
+            )
+            .href;
+
+
+        const body =
+            new URLSearchParams();
+
+
+        body.set(
+            'updangka',
+            number
+        );
+
+
+        const response =
+
+            await fetch(
+
+                url,
+
+                {
+                    method:
+                        'POST',
+
+                    headers: {
+
+                        'Content-Type':
+
+                            'application/x-www-form-urlencoded;charset=UTF-8'
+                    },
+
+                    body:
+                        body.toString(),
+
+                    credentials:
+                        'same-origin',
+
+                    redirect:
+                        'follow'
+                }
+            );
+
+
+        if (
+            !response.ok
+        ) {
+
+            throw new Error(
+
+                `HTTP ${response.status}`
+            );
+        }
+
+
+        if (
+            item.input
+        ) {
+
+            setValue(
+                item.input,
+                number
+            );
+        }
+    }
+
+
+    // =========================================================
+    // PROCESS UPDATE
+    // =========================================================
+
+    async function processPanelUpdates(
+        numbers
+    ) {
+
+        let success =
+            0;
+
+
+        let skipped =
+            0;
+
+
+        let failed =
+            0;
+
+
+        for (
+
+            let i = 0;
+
+            i <
+            currentQueue.length;
+
+            i++
+        ) {
+
+            if (!running) {
+
+                break;
+            }
+
+
+            const item =
+                currentQueue[i];
+
+
+            const key =
+
+                makeResultKey(
+                    item.market,
+                    item.dateISO
+                );
+
+
+            const history =
+                numbers[
+                    key
+                ];
+
+
+            if (
+
+                !history
+
+                ||
+
+                !isValidNumber(
+                    item.market,
+                    history.number
+                )
+            ) {
+
+                skipped++;
+
+                continue;
+            }
+
+
+            // =============================================
+            // DATE SAFETY
+            // =============================================
+
+            if (
+
+                history.date !==
+                    item.dateISO
+
+            ) {
+
+                console.error(
+
+                    '[PIAN105 DATE BLOCK]',
+
+                    item.market,
+
+                    item.dateISO,
+
+                    history.date
+                );
+
+
+                skipped++;
+
+                continue;
+            }
+
+
+            // =============================================
+            // RESULT TIME TIDAK BOLEH MASA DEPAN
+            // =============================================
+
+            const resultTime =
+
+                new Date(
+
+                    `${history.date}T`
+
+                    +
+
+                    `${pad(history.hour)}:`
+
+                    +
+
+                    `${pad(history.minute || 0)}:`
+
+                    +
+
+                    `${pad(history.second || 0)}`
+                );
+
+
+            if (
+
+                Number.isNaN(
+                    resultTime.getTime()
+                )
+
+                ||
+
+                resultTime >
+                    new Date()
+            ) {
+
+                console.error(
+
+                    '[PIAN105 FUTURE BLOCK]',
+
+                    item.market,
+
+                    history
+                );
+
+
+                skipped++;
+
+                continue;
+            }
+
+
+            // =============================================
+            // SLOT SAFETY
+            // =============================================
+
+            const config =
+
+                HISTORY_POOL[
+                    item.market
+                ];
+
+
+            if (
+
+                Number.isInteger(
+                    config?.slotHour
+                )
+
+                &&
+
+                Number(
+                    history.hour
+                ) !==
+                    config.slotHour
+            ) {
+
+                console.error(
+
+                    '[PIAN105 SLOT BLOCK]',
+
+                    item.market,
+
+                    config.slotHour,
+
+                    history.hour
+                );
+
+
+                skipped++;
+
+                continue;
+            }
+
+
+            // =============================================
+            // JANGAN TIMPA ANGKA VALID
+            // =============================================
+
+            const currentValue =
+
+                item.input
+
+                    ? String(
+                        item.input.value || ''
+                    )
+                    .trim()
+
+                    : '';
+
+
+            if (
+
+                isValidNumber(
+                    item.market,
+                    currentValue
+                )
+
+            ) {
+
+                skipped++;
+
+                continue;
+            }
+
+
+            try {
+
+                setStatus(
+
+                    `✏️ [${i + 1}/${currentQueue.length}] `
+
+                    +
+
+                    `${item.market} | `
+
+                    +
+
+                    `${item.dateISO} ${history.time} → `
+
+                    +
+
+                    `${history.number}`
+                );
+
+
+                await updatePanelRow(
+                    item,
+                    history.number
+                );
+
+
+                success++;
+
+
+                console.log(
+
+                    '[PIAN105 UPDATE OK]',
+
+                    item.market,
+
+                    item.dateISO,
+
+                    history.pool,
+
+                    history.code,
+
+                    history.time,
+
+                    history.number
+                );
+
+
+            } catch (error) {
+
+                failed++;
+
+
+                console.error(
+
+                    '[PIAN105 UPDATE ERROR]',
+
+                    item.market,
+
+                    error
+                );
+            }
+
+
+            await sleep(
+                UPDATE_DELAY
+            );
+        }
+
+
+        running =
+            false;
+
+
+        setStatus(
+
+            currentRunMode ===
+                'auto'
+
+                ?
+
+                `🤖 AUTO SELESAI — berhasil ${success}, skip ${skipped}, gagal ${failed}`
+
+                :
+
+                `✅ SELESAI — berhasil ${success}, skip ${skipped}, gagal ${failed}`
+        );
+
+
+        refreshInfo();
+    }
+
+
+    // =========================================================
+    // BRIDGE STATUS
+    // =========================================================
+
+    function handleHistoryStatus(
+        status
+    ) {
+
+        if (
+
+            !status
+
+            ||
+
+            status.jobId !==
+                activeJobId
+        ) {
+
+            return;
+        }
+
+
+        if (
+
+            status.status ===
+                'syncing'
+        ) {
+
+            setStatus(
+
+                `🌧️ History [${status.current}/${status.total}] `
+
+                +
+
+                `${status.market} → ${status.pool || '-'}`
+            );
+
+
+            return;
+        }
+
+
+        if (
+
+            status.status ===
+                'stopped'
+        ) {
+
+            running =
+                false;
+
+
+            setStatus(
+                '⛔ Proses dihentikan'
+            );
+
+
+            return;
+        }
+
+
+        if (
+
+            status.status ===
+                'done'
+        ) {
+
+            if (
+
+                finishedJobId ===
+                    status.jobId
+
+            ) {
+
+                return;
+            }
+
+
+            finishedJobId =
+                status.jobId;
+
+
+            const data =
+
+                GM_getValue(
+                    K.data,
+                    {}
+                );
+
+
+            const numbers =
+
+                data.numbers
+
+                ||
+
+                {};
+
+
+            setStatus(
+
+                `✅ History cocok ${Object.keys(numbers).length}. Mulai update Z-Panel...`
+            );
+
+
+            processPanelUpdates(
+                numbers
+            );
+        }
+    }
+
+
+    function initPanelBridge() {
+
+        GM_addValueChangeListener(
+
+            K.status,
+
+            function (
+                name,
+                oldValue,
+                newValue
+            ) {
+
+                handleHistoryStatus(
+                    newValue
+                );
+            }
+        );
+
+
+        setInterval(
+
+            function () {
+
+                if (
+                    !activeJobId
+                ) {
+
+                    return;
+                }
+
+
+                handleHistoryStatus(
+
+                    GM_getValue(
+                        K.status,
+                        null
+                    )
+                );
+
+            },
+
+            800
+        );
+    }
+
+
+    // =========================================================
+    // AUTO CHECK
+    // =========================================================
+
+    function isAutoEnabled() {
+
+        return (
+
+            GM_getValue(
+                K.auto,
+                true
+            )
+
+            !==
+
+            false
+        );
+    }
+
+
+    function refreshAutoUI() {
+
+        const button =
+
+            document.querySelector(
+                '#pian105-auto'
+            );
+
+
+        const info =
+
+            document.querySelector(
+                '#pian105-auto-info'
+            );
+
+
+        const enabled =
+            isAutoEnabled();
+
+
+        const last =
+
+            Number(
+
+                GM_getValue(
+                    K.last,
+                    0
+                )
+            );
+
+
+        const next =
+
+            last
+
+                ? last +
+                    AUTO_INTERVAL
+
+                : Date.now();
+
+
+        if (button) {
+
+            button.textContent =
+
+                enabled
+
+                    ? '🟢 AUTO 30 MENIT: ON'
+
+                    : '⚪ AUTO 30 MENIT: OFF';
+
+
+            button.style.background =
+
+                enabled
+
+                    ? '#2b8a3e'
+
+                    : '#555';
+        }
+
+
+        if (info) {
+
+            info.innerHTML =
+
+                `Terakhir: <b>${last ? new Date(last).toLocaleTimeString() : '-'}</b>`
+
+                +
+
+                `<br>Berikutnya: <b>${enabled ? new Date(next).toLocaleTimeString() : '-'}</b>`;
+        }
+    }
+
+
+    async function runAutomaticCheck(
+        force = false
+    ) {
+
+        if (
+
+            !isAutoEnabled()
+
+            &&
+
+            !force
+        ) {
+
+            return;
+        }
+
+
+        if (running) {
+
+            return;
+        }
+
+
+        const now =
+            Date.now();
+
+
+        const last =
+
+            Number(
+
+                GM_getValue(
+                    K.last,
+                    0
+                )
+            );
+
+
+        if (
+
+            !force
+
+            &&
+
+            last
+
+            &&
+
+            now - last <
+                AUTO_INTERVAL
+        ) {
+
+            return;
+        }
+
+
+        GM_setValue(
+            K.last,
+            now
+        );
+
+
+        refreshAutoUI();
+
+
+        await startInputResults(
+            'auto'
+        );
+    }
+
+
+    function toggleAuto() {
+
+        const enabled =
+            !isAutoEnabled();
+
+
+        GM_setValue(
+            K.auto,
+            enabled
+        );
+
+
+        refreshAutoUI();
+
+
+        setStatus(
+
+            enabled
+
+                ? '🟢 AUTO 30 MENIT diaktifkan'
+
+                : '⚪ AUTO 30 MENIT dimatikan'
+        );
+
+
+        if (enabled) {
+
+            setTimeout(
+
+                function () {
+
+                    runAutomaticCheck(
+                        false
+                    );
+
+                },
+
+                500
+            );
+        }
+    }
+
+
+    // =========================================================
+    // STOP
+    // =========================================================
+
+    function stopAll() {
+
+        running =
+            false;
+
+
+        if (
+            activeJobId
+        ) {
+
+            GM_setValue(
+                K.stop,
+                activeJobId
+            );
+        }
+
+
+        setStatus(
+            '⛔ Proses aktif dihentikan'
+        );
+    }
+
+
+    // =========================================================
+    // UI
+    // =========================================================
+
+    function createPanel() {
+
+        if (
+
+            document.querySelector(
+                '#pian105-panel'
+            )
+
+        ) {
+
+            return;
+        }
+
+
+        const panel =
+
+            document.createElement(
+                'div'
+            );
+
+
+        panel.id =
+            'pian105-panel';
+
+
+        panel.innerHTML = `
+
+            <div id="pian105-header">
+
+                ⚙️ PIAN AUTO RESULT MANAGER V${VERSION}
+
+            </div>
+
+
+            <div id="pian105-body">
+
+
+                <div class="pian105-ready">
+
+                    ✅ Z-PANEL PIAN READY
+
+                </div>
+
+
+                <div id="pian105-history">
+
+                    ⚠️ HISTORY HUJAN39 BELUM TERHUBUNG
+
+                </div>
+
+
+                <div id="pian105-clock">
+
+                    📅 ${getTodayISO()}
+                    &nbsp;
+                    🕒 ${getClock()}
+
+                </div>
+
+
+                <div id="pian105-count">
+
+                    Membaca tabel...
+
+                </div>
+
+
+                <div class="pian105-safety">
+
+                    🛡️ SAFE MODE V10.5
+
+                    <br>
+
+                    ✅ Dynamic HUJAN39 Pool
+
+                    <br>
+
+                    ✅ Tanggal wajib sama
+
+                    <br>
+
+                    ✅ Future result diblokir
+
+                    <br>
+
+                    ✅ Slot jam divalidasi
+
+                </div>
+
+
+                <div class="pian105-step">
+
+                    STEP 1
+
+                </div>
+
+
+                <button id="pian105-add">
+
+                    ➕ TAMBAH PASARAN OTOMATIS
+
+                </button>
+
+
+                <div class="pian105-note">
+
+                    Tambahkan pasaran yang belum ada
+                    pada tanggal hari ini.
+
+                    <br>
+
+                    Angka awal: XXXX.
+
+                </div>
+
+
+                <div class="pian105-step">
+
+                    STEP 2
+
+                </div>
+
+
+                <button id="pian105-input">
+
+                    🔢 CEK & INPUT SEKARANG
+
+                </button>
+
+
+                <div class="pian105-note">
+
+                    Cocokkan:
+
+                    <br>
+
+                    Pasaran + Pool HUJAN39 +
+                    tanggal + jam.
+
+                    <br><br>
+
+                    TOTO MACAU 4D:
+                    00 / 13 / 16 / 19 / 22 / 23.
+
+                    <br>
+
+                    TOTO MACAO 5D:
+                    15 / 21.
+
+                    <br>
+
+                    KINGKONG:
+                    17 / 23.
+
+                    <br><br>
+
+                    Hanya result yang benar-benar
+                    sudah tersedia yang akan diinput.
+
+                </div>
+
+
+                <div class="pian105-step">
+
+                    AUTO CHECK
+
+                </div>
+
+
+                <button id="pian105-auto">
+
+                    🟢 AUTO 30 MENIT: ON
+
+                </button>
+
+
+                <div id="pian105-auto-info">
+
+                    Membaca status auto...
+
+                </div>
+
+
+                <button id="pian105-now">
+
+                    🤖 JALANKAN AUTO CHECK SEKARANG
+
+                </button>
+
+
+                <button id="pian105-refresh">
+
+                    🔄 REFRESH STATUS
+
+                </button>
+
+
+                <button id="pian105-stop">
+
+                    ⛔ STOP PROSES AKTIF
+
+                </button>
+
+
+                <div id="pian105-status">
+
+                    Siap...
+
+                </div>
+
+            </div>
+        `;
+
+
+        panel.style.cssText = `
+
+            position:fixed !important;
+
+            left:0 !important;
+            top:0 !important;
+
+            width:305px !important;
+
+            max-height:100vh !important;
+
+            overflow-y:auto !important;
+
+            z-index:2147483647 !important;
+
+            background:#111 !important;
+
+            color:#fff !important;
+
+            border:1px solid #444 !important;
+
+            box-shadow:
+                0 8px 30px
+                rgba(0,0,0,.75) !important;
+
+            font:
+                10px Arial,
+                sans-serif !important;
+        `;
+
+
+        document.body.appendChild(
+            panel
+        );
+
+
+        const style =
+
+            document.createElement(
+                'style'
+            );
+
+
+        style.textContent = `
+
+            #pian105-header {
+
+                padding:11px;
+
+                background:#222;
+
+                text-align:center;
+
+                font-weight:bold;
+            }
+
+
+            #pian105-body {
+
+                padding:8px;
+            }
+
+
+            .pian105-ready {
+
+                padding:7px;
+
+                background:#153b24;
+
+                border:
+                    1px solid #2f9e44;
+
+                color:#8ce99a;
+
+                text-align:center;
+
+                border-radius:4px;
+            }
+
+
+            #pian105-history,
+            #pian105-clock,
+            #pian105-count,
+            #pian105-auto-info,
+            #pian105-status,
+            .pian105-note,
+            .pian105-safety {
+
+                padding:7px;
+
+                margin-top:6px;
+
+                background:#1c1c1c;
+
+                border:
+                    1px solid #333;
+
+                border-radius:4px;
+
+                line-height:1.5;
+            }
+
+
+            .pian105-safety {
+
+                color:#8ce99a;
+
+                border-color:#2f9e44;
+            }
+
+
+            .pian105-step {
+
+                margin-top:10px;
+
+                padding:5px;
+
+                background:#292929;
+
+                font-weight:bold;
+
+                text-align:center;
+
+                border-radius:4px;
+            }
+
+
+            .pian105-note {
+
+                color:#aaa;
+
+                font-size:9px;
+            }
+
+
+            #pian105-panel button {
+
+                width:100%;
+
+                padding:10px;
+
+                margin-top:6px;
+
+                border:0;
+
+                border-radius:4px;
+
+                color:#fff;
+
+                font-weight:bold;
+
+                font-size:10px;
+
+                cursor:pointer;
+            }
+
+
+            #pian105-add {
+
+                background:#245c9c;
+            }
+
+
+            #pian105-input {
+
+                background:#087f5b;
+            }
+
+
+            #pian105-auto {
+
+                background:#2b8a3e;
+            }
+
+
+            #pian105-now {
+
+                background:#5f3dc4;
+            }
+
+
+            #pian105-refresh {
+
+                background:#495057;
+            }
+
+
+            #pian105-stop {
+
+                background:#9b2226;
+            }
+        `;
+
+
+        document.head.appendChild(
+            style
+        );
+
+
+        // =====================================================
+        // EVENTS
+        // =====================================================
+
+        document
+        .querySelector(
+            '#pian105-add'
+        )
+        .onclick =
+            startAddMarkets;
+
+
+        document
+        .querySelector(
+            '#pian105-input'
+        )
+        .onclick =
+
+            function () {
+
+                startInputResults(
+                    'manual'
+                );
+            };
+
+
+        document
+        .querySelector(
+            '#pian105-auto'
+        )
+        .onclick =
+            toggleAuto;
+
+
+        document
+        .querySelector(
+            '#pian105-now'
+        )
+        .onclick =
+
+            function () {
+
+                runAutomaticCheck(
+                    true
+                );
+            };
+
+
+        document
+        .querySelector(
+            '#pian105-refresh'
+        )
+        .onclick =
+
+            function () {
+
+                refreshInfo();
+
+
+                setStatus(
+                    '🔄 Status diperbarui'
+                );
+            };
+
+
+        document
+        .querySelector(
+            '#pian105-stop'
+        )
+        .onclick =
+            stopAll;
+
+
+        refreshInfo();
+
+        refreshAutoUI();
+
+
+        // =====================================================
+        // CLOCK
+        // =====================================================
+
+        setInterval(
+
+            function () {
+
+                const clock =
+
+                    document.querySelector(
+                        '#pian105-clock'
+                    );
+
+
+                if (clock) {
+
+                    clock.innerHTML =
+
+                        `📅 ${getTodayISO()} &nbsp; 🕒 ${getClock()}`;
+                }
+
+
+                refreshInfo();
+
+            },
+
+            1000
+        );
+
+
+        // =====================================================
+        // AUTO CHECK WATCHER
+        // =====================================================
+
+        setInterval(
+
+            function () {
+
+                runAutomaticCheck(
+                    false
+                );
+
+            },
+
+            WATCH_INTERVAL
+        );
+
+
+        // =====================================================
+        // AUTO CHECK SAAT OPEN
+        // =====================================================
+
+        setTimeout(
+
+            function () {
+
+                runAutomaticCheck(
+                    false
+                );
+
+            },
+
+            4000
+        );
+    }
+
+
+    // =========================================================
+    // INIT ZPANEL
+    // =========================================================
+
+    function initZPanel() {
+
+        createPanel();
+
+        initPanelBridge();
+    }
+
+
+    // =========================================================
+    // START
+    // =========================================================
+
+    console.log(
+        '========================================'
+    );
+
+    console.log(
+        `PIAN + HUJAN39 AUTO RESULT V${VERSION}`
+    );
+
+    console.log(
+        'Dynamic History Mapping: ON'
+    );
+
+    console.log(
+        'Date Safety: ON'
+    );
+
+    console.log(
+        'Future Result Block: ON'
+    );
+
+    console.log(
+        'Slot Safety: ON'
+    );
+
+    console.log(
+        location.href
+    );
+
+    console.log(
+        '========================================'
+    );
+
+
+    if (
+        isHistorySite()
+    ) {
+
+        initHistorySite();
+
+        return;
+    }
+
+
+    if (
+        isZPanel()
+    ) {
+
+        initZPanel();
+
+        return;
+    }
+
+})();
